@@ -1,3 +1,5 @@
+from typing import Any
+
 from web3 import Web3
 from web3.exceptions import Web3RPCError
 from web3.middleware import ExtraDataToPOAMiddleware
@@ -45,3 +47,14 @@ def get_logs_chunked(
         logs.extend(chunk)
         start = end + 1
     return logs
+
+
+def get_contract_creation(w3: Web3, address: str) -> dict[str, Any]:
+    """Tx pembuatan kontrak (deployer = `from`). Method khusus NodeReal.
+
+    Etherscan getcontractcreation tidak tersedia di free tier untuk BSC.
+    """
+    resp = w3.provider.make_request("nr_getContractCreationTransaction", [address])
+    if resp.get("error") or not resp.get("result"):
+        raise RuntimeError(f"creation tx tidak ditemukan untuk {address}: {resp.get('error')}")
+    return resp["result"]

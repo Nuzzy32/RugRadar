@@ -33,5 +33,6 @@ DEAD_ADDRESSES = frozenset(
 
 SNAPSHOT_HOURS = 24
 
-# Etherscan API V2. Free tier BSC hanya mencakup endpoint source code & contract creation.
+# Etherscan API V2. Free tier BSC: getsourcecode jalan, getcontractcreation tidak
+# (deployer diambil lewat chain.rpc.get_contract_creation).
 EXPLORER_API_URL = "https://api.etherscan.io/v2/api"

@@ -26,14 +26,3 @@ def _get(params: dict[str, str]) -> Any:
 def get_source_code(address: str) -> dict[str, Any]:
     """Kontrak belum terverifikasi tetap sukses, dengan SourceCode kosong."""
     return _get({"module": "contract", "action": "getsourcecode", "address": address})[0]
-
-
-def get_contract_creation(addresses: list[str]) -> list[dict[str, Any]]:
-    """Maksimal 5 alamat per panggilan."""
-    return _get(
-        {
-            "module": "contract",
-            "action": "getcontractcreation",
-            "contractaddresses": ",".join(addresses),
-        }
-    )

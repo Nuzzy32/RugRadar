@@ -9,12 +9,13 @@ import time
 from collections import Counter
 from datetime import UTC, datetime
 
+from hexbytes import HexBytes
 from web3 import Web3
 
 from pipeline.chain import explorer
 from pipeline.chain.abi import ERC20_ABI, FACTORY_ABI, PAIR_ABI, ROUTER_ABI
 from pipeline.chain.blocks import block_at_timestamp
-from pipeline.chain.rpc import get_logs_chunked, make_web3
+from pipeline.chain.rpc import get_contract_creation, get_logs_chunked, make_web3
 from pipeline.config import (
     BSC_CHAIN_ID,
     DEAD_ADDRESSES,
@@ -67,7 +68,8 @@ def main() -> None:
 
     pair_c = w3.eth.contract(abi=PAIR_ABI)
     topic_name = {
-        getattr(pair_c.events, n)().topic: n for n in ("Sync", "Mint", "Burn", "Swap", "Transfer")
+        HexBytes(getattr(pair_c.events, n)().topic): n
+        for n in ("Sync", "Mint", "Burn", "Swap", "Transfer")
     }
     swap_ev = pair_c.events.Swap()
     skip = DEAD_ADDRESSES | {PANCAKE_V2_ROUTER}
@@ -122,16 +124,18 @@ def main() -> None:
         result = simulate_sell(fork, token, holder)
     print(f"{result.model_dump()} | {time.monotonic() - t:.1f}s")
 
+    step("Deployer (NodeReal nr_getContractCreationTransaction)")
+    creation = get_contract_creation(w3, token)
+    print(f"deployer={creation['from']} block={creation['blockNumber']} tx={creation['hash']}")
+
     step("Explorer API (Etherscan V2)")
     if not settings.explorer_api_key:
         print("EXPLORER_API_KEY belum diisi, dilewati")
     else:
         try:
             src = explorer.get_source_code(token)
-            creation = explorer.get_contract_creation([token])[0]
             verified = bool(src.get("SourceCode"))
             print(f"terverifikasi={verified} nama_kontrak={src.get('ContractName')!r:.60}")
-            print(f"deployer={creation['contractCreator']} tx={creation['txHash']}")
         except explorer.ExplorerError as e:
             print(f"GAGAL: {e}")
 
