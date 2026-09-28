@@ -49,6 +49,12 @@ def get_logs_chunked(
     return logs
 
 
+def log_timestamp(log: LogReceipt) -> int:
+    """`blockTimestamp` ikut di log NodeReal (hex string), jadi tak perlu eth_getBlock."""
+    ts = log["blockTimestamp"]
+    return int(ts, 16) if isinstance(ts, str) else int(ts)
+
+
 def get_contract_creation(w3: Web3, address: str) -> dict[str, Any]:
     """Tx pembuatan kontrak (deployer = `from`). Method khusus NodeReal.
 

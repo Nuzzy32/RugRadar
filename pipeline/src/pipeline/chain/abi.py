@@ -70,6 +70,37 @@ ERC20_ABI = [
     _fn("decimals", [], ["uint8"]),
     _fn("symbol", [], ["string"]),
     _fn("approve", ["address", "uint256"], ["bool"], view=False),
+    _fn("name", [], ["string"]),
+    _fn("totalSupply", [], ["uint256"]),
+]
+
+MULTICALL3_ABI = [
+    {
+        "type": "function",
+        "name": "aggregate3",
+        "stateMutability": "payable",
+        "inputs": [
+            {
+                "name": "calls",
+                "type": "tuple[]",
+                "components": [
+                    {"name": "target", "type": "address"},
+                    {"name": "allowFailure", "type": "bool"},
+                    {"name": "callData", "type": "bytes"},
+                ],
+            }
+        ],
+        "outputs": [
+            {
+                "name": "returnData",
+                "type": "tuple[]",
+                "components": [
+                    {"name": "success", "type": "bool"},
+                    {"name": "returnData", "type": "bytes"},
+                ],
+            }
+        ],
+    }
 ]
 
 ROUTER_ABI = [
