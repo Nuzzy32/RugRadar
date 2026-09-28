@@ -44,21 +44,26 @@ CREATE TABLE deployers (
 );
 ```
 
-## Event Mentah
+## Event Mentah (Parquet)
+
+Event mentah **tidak** disimpan di Postgres, tapi di Parquet lokal (`data/raw/`), lihat `ARCHITECTURE.md` bagian Penyimpanan. Kolomnya sama dengan definisi di bawah; nilai `uint256` disimpan sebagai string desimal (exact, karena `decimal256` Parquet hanya 76 digit). Definisi SQL di bawah dipertahankan sebagai spesifikasi kolom.
 
 ```sql
 CREATE TABLE pool_events (
-  pair          evm_address NOT NULL REFERENCES pairs(address),
-  block_number  BIGINT NOT NULL,
-  tx_hash       TEXT NOT NULL,
-  log_index     INT NOT NULL,
-  event_type    TEXT NOT NULL CHECK (event_type IN ('sync','mint','burn','swap')),
-  tx_from       evm_address,        -- pengirim transaksi asli
-  reserve_token uint256,            -- untuk sync
-  reserve_wbnb  uint256,            -- untuk sync
-  amount_token  uint256,
-  amount_wbnb   uint256,
-  recipient     evm_address,        -- field "to" pada burn/swap
+  pair             evm_address NOT NULL REFERENCES pairs(address),
+  block_number     BIGINT NOT NULL,
+  block_time       TIMESTAMPTZ NOT NULL,  -- dari blockTimestamp di log
+  tx_hash          TEXT NOT NULL,
+  log_index        INT NOT NULL,
+  event_type       TEXT NOT NULL CHECK (event_type IN ('sync','mint','burn','swap')),
+  reserve_token    uint256,            -- sync
+  reserve_wbnb     uint256,            -- sync
+  amount_token_in  uint256,            -- arah relatif terhadap pool: swap jual / mint
+  amount_wbnb_in   uint256,            -- swap beli / mint
+  amount_token_out uint256,            -- swap beli / burn
+  amount_wbnb_out  uint256,            -- swap jual / burn
+  recipient        evm_address,        -- field "to" pada burn/swap
+  tx_from          evm_address,        -- pengirim transaksi asli, hanya diisi untuk burn
   PRIMARY KEY (tx_hash, log_index)
 );
 CREATE INDEX ON pool_events (pair, block_number);
@@ -72,7 +77,7 @@ CREATE TABLE lp_transfers (
   to_addr       evm_address NOT NULL,
   amount        uint256 NOT NULL,
   PRIMARY KEY (tx_hash, log_index)
-);
+);  -- juga punya kolom block_time
 CREATE INDEX ON lp_transfers (pair, block_number);
 
 CREATE TABLE token_transfers (
@@ -84,9 +89,21 @@ CREATE TABLE token_transfers (
   to_addr       evm_address NOT NULL,
   amount        uint256 NOT NULL,
   PRIMARY KEY (tx_hash, log_index)
-);
+);  -- juga punya kolom block_time
 CREATE INDEX ON token_transfers (token, block_number);
 ```
+
+### Cakupan penyimpanan event
+
+Skema Postgres sebenarnya ada di `supabase/migrations/`, skema Parquet di `pipeline/src/pipeline/indexer/events.py` (`SCHEMAS`). Untuk menghemat storage:
+
+| Tabel | Disimpan untuk block |
+|---|---|
+| `pool_events` sync/mint/burn, `lp_transfers` | T0 sampai T0 + `INDEX_WINDOW_DAYS` (30 hari) |
+| `pool_events` swap | T0 sampai `snapshot_block` (hanya dipakai fitur) |
+| `token_transfers` | token dibuat sampai `snapshot_block` (distribusi holder) |
+
+Cadangan hari ke-90 untuk label `clean` dibaca langsung lewat `getReserves()` di block hari ke-90 saat labeling, bukan dari event. Token yang dibuat lebih dari `MAX_TOKEN_AGE_AT_PAIR_DAYS` sebelum pair WBNB-nya tidak diindeks (bukan token baru).
 
 ## Analisis, Label, Fitur, Prediksi
 

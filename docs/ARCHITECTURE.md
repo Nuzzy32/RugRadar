@@ -9,7 +9,7 @@
 ┌────────────────────────────────────────────────────────────────────┐
 │ pipeline (Python)                                                  │
 │                                                                    │
-│  indexer ──► Postgres (raw events) ──► labeling ──► labels         │
+│  indexer ──► Parquet (raw events) ───► labeling ──► labels         │
 │                     │                                              │
 │                     ├──► features (as_of_block) ──► feature_snaps  │
 │                     │                                              │
@@ -31,13 +31,22 @@
 | Komponen | Tanggung jawab |
 |---|---|
 | `chain/` | Client RPC dengan retry dan backoff, client explorer API, `block_at_timestamp()` (binary search) |
-| `indexer/` | Ambil event `PairCreated` dari factory, lalu `Sync`, `Mint`, `Burn`, `Swap`, dan `Transfer` LP token per pair. Simpan checkpoint |
+| `indexer/` | Ambil event `PairCreated` dari factory (tokens/pairs ke Postgres), lalu `Sync`, `Mint`, `Burn`, `Swap`, `Transfer` LP dan transfer token ke Parquet lokal. Checkpoint per job di Postgres |
 | `simulation/` | Simulasi beli lalu jual di fork untuk mendeteksi honeypot dan mengukur pajak |
 | `labeling/` | Menentukan label per token berdasarkan data setelah snapshot |
 | `features/` | Menghitung fitur point-in-time pada `as_of_block` |
 | `training/` | Membangun dataset, split, training, kalibrasi, evaluasi, menyimpan model |
 | `api/` | Menyajikan prediksi yang sudah dihitung |
 | `web/` | Menampilkan hasil ke user |
+
+### Penyimpanan
+
+| Data | Tempat | Alasan |
+|---|---|---|
+| Event mentah (swap, sync, mint, burn, transfer LP, transfer token) | Parquet di `data/raw/<tabel>/<job>/<a>_<b>.parquet` (tidak di-commit) | 1 hari data ~517 MB di Postgres vs ~48 MB Parquet (zstd). Tiga bulan tidak muat di Supabase free tier |
+| tokens, pairs, deployers, label, fitur, simulasi, model, prediksi, checkpoint | Postgres (Supabase) | Kecil, dan dibutuhkan API |
+
+Satu file Parquet per chunk block dengan nama deterministik, ditulis atomik (tmp lalu rename), dan checkpoint disimpan setelah file selesai. Menjalankan ulang chunk menimpa file yang sama, jadi tidak ada duplikat. Pembaca tetap dedupe dengan `(tx_hash, log_index)` untuk berjaga-jaga jika ukuran chunk pernah diubah.
 
 ## 3. Konsep Waktu (Penting)
 

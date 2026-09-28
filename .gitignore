@@ -20,3 +20,6 @@ node_modules/
 
 # OS
 .DS_Store
+
+# Data lokal (event mentah Parquet, artefak model)
+data/
